@@ -1,0 +1,12 @@
+{application, getui_erl_sdk,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { getui_erl_sdk_app, []}},
+  {env, []}
+ ]}.
