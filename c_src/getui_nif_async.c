@@ -417,10 +417,6 @@ static ERL_NIF_TERM start_getui(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
 	//printf("pushInit for app failed: ret=%d\n", r);
     }
 
-#ifdef DEBUG
-    printf("workers:%d start status:%d \n", workers, r);
-#endif
-
     if(tracker_init(tracker) < 0 ) {
         enif_free(tracker);
         return -1;
