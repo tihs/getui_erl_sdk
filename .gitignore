@@ -5,6 +5,7 @@
 /deps.log
 /erl_crash.dump
 /deps/
+/priv/
 compile.log
 .settings
 erl_crash.dump
