@@ -1,0 +1,10 @@
+/ebin/
+/.project
+/rel/mongooseim
+.rebar/
+/deps.log
+/erl_crash.dump
+/deps/
+compile.log
+.settings
+erl_crash.dump
