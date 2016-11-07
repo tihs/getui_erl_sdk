@@ -1,5 +1,5 @@
 -module(getui_erl_sdk).
--export([init/0, start_getui/5, push/2]).
+-export([init/0, start_getui/5, push_trans/2, push_notifi/3]).
 -on_load(init/0).
 
 init() ->
@@ -8,7 +8,9 @@ init() ->
 
 start_getui(Host, AppId, AppKey, MasterSecret, Workers) ->
     exit(nif_library_not_loaded).
-push(Token, Data) ->
+push_trans(Token, Data) ->
+    exit(nif_library_not_loaded).
+push_notifi(Token, Title, Content) ->
     exit(nif_library_not_loaded).
 
 priv_dir() ->

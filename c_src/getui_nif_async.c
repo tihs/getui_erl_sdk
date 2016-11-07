@@ -23,7 +23,6 @@ int workers = 7;
 static char *host ="http://sdk.open.api.igexin.com/apiex.htm";
 char appId[1024] = {0};
 char appKey[1024] = {0};
-static char *masterSecret = "fk8SdC1h1I81FjNQQh2Ax2";
 static char *cid = "";
 static char *dt="";
 
@@ -51,12 +50,14 @@ typedef struct
     ERL_NIF_TERM arg2;
     ERL_NIF_TERM arg3;
     
+    int push_type;
     char arg_c1[STACK_STRING_BUFF];
     char arg_c2[STACK_STRING_BUFF];
+    char arg_c3[STACK_STRING_BUFF];
 
 }msg_t;
 
-static msg_t *msg_create() {
+static msg_t *msg_create(int push_type) {
     ErlNifEnv *env;
     msg_t *msg;
 
@@ -74,10 +75,11 @@ static msg_t *msg_create() {
     msg->env =  env;
     msg->type = msg_unknown;
     msg->ref = 0;
+    msg->push_type = push_type;
 
     memset(msg->arg_c1, 0, STACK_STRING_BUFF);
     memset(msg->arg_c2, 0, STACK_STRING_BUFF);
-
+    memset(msg->arg_c3, 0, STACK_STRING_BUFF);
     return msg;
 }
 
@@ -121,17 +123,18 @@ make_error_tuple(ErlNifEnv *env, const char *reason)
 
 void gencall(ErlNifEnv *env, 
         char *arg1,
-        char *arg2);
+        char *arg2,
+		int push_type);
 
 
 void exe_msg(msg_t *msg, worker_t *w)
 {
-    switch(msg->type) {
-    case msg_gencall:
-        gencall(msg->env,  msg->arg_c1, msg->arg_c2);
-    default:
-        make_error_tuple(msg->env, "invalid_command");
-    }
+	if (msg->push_type) {
+		tosingle_trans(msg->arg_c1, msg->arg_c2);
+	} else {
+		tosingle_notifi(msg->arg_c1, msg->arg_c2, msg->arg_c3);
+	}
+
 }
 
 static void *
@@ -200,7 +203,7 @@ int worker_init(worker_t *worker,int id)
 
 void woker_destory(worker_t *w)
 {
-    msg_t *msg = msg_create();
+    msg_t *msg = msg_create(0);
     msg->type = msg_stop;
     queue_push(w->q, msg);
 
@@ -275,19 +278,6 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM load_info)
 #define FMT_WRONG  "fmt wrong"
 
 
-void gencall(ErlNifEnv *env, 
-        char *arg1,
-        char *arg2)
-{
-
-    tosingletest(arg1, arg2);
-
-#ifdef DEBUG
-    printf("max size:%d  args1:%s args2:%s \r\n", STACK_STRING_BUFF, arg1, arg2);
-#endif
-
-}
-
 void printResult(IPushResult result) {
 #ifdef DEBUG
     printf("print result:-------------\r\n");
@@ -310,36 +300,22 @@ void TransmissionTemplateDemo(TransmissionTemplate* templ, char *data)
     templ->transmissionContent = data;
     //templ->transmissionContent = "{\"sound\":\"test1.wav\",\"badge\":4}";
 
-
-/*
-	templ->t.pushInfo.badge=4;
-	templ->t.pushInfo.sound="text1.wav";
-	templ->t.pushInfo.contentAvailable=1;
-	templ->t.pushInfo.category="";
-	Entry cmsg = {0};//
-	strcpy(cmsg.key,"");
-	strcpy(cmsg.value,"");
-	templ->t.pushInfo.cmsg.size=2;
-	templ->t.pushInfo.cmsg.map=&cmsg;
-	templ->t.pushInfo.body="";
-	templ->t.pushInfo.actionLocKey="";
-	templ->t.pushInfo.locKey="";
-	ListItem locargs[2]={"name","body"};//
-	templ->t.pushInfo.locArgs.size=2;
-	templ->t.pushInfo.locArgs.item=locargs;
-	templ->t.pushInfo.launchImage="";
-	
-	templ->t.pushInfo.title="";
-	templ->t.pushInfo.titleLocKey="";
-	ListItem titlelocargs[2]={"",""};//
-	templ->t.pushInfo.titleLocArgs.size=2;
-	templ->t.pushInfo.titleLocArgs.item=titlelocargs;
-
-*/
-
 } 
 
-void tosingletest(char *token, char *data){
+void NotificationTemplateDemo(NotificationTemplate* templ, char *title, char *content)
+{
+    templ->t.appId = appId;
+    templ->t.appKey = appKey;
+
+    templ->transmissionType = 2;
+
+    templ->title = title;
+    templ->text = content;
+    templ->logo = "";
+    //templ->transmissionContent = "{\"sound\":\"test1.wav\",\"badge\":4}";
+}
+
+void tosingle_trans(char *token, char *data) {
 	
     Message msg = {0};
     msg.isOffline = true;
@@ -357,14 +333,34 @@ void tosingletest(char *token, char *data){
     IPushResult result = {0};
 
 
-    TransmissionTemplate tmpl= {0};
-    TransmissionTemplateDemo(& tmpl, data);
-    //printf("appkey:%s \n", appKey);
-    result = pushMessageToSingle(appKey, &singleMsg, &tmpl, Transmission, &target);
+	TransmissionTemplate tmpl= {0};
+	TransmissionTemplateDemo(& tmpl, data);
+	result = pushMessageToSingle(appKey, &singleMsg, &tmpl, Transmission, &target);
 
-    //NotificationTemplate tmpl = {0};
-    //NotificationTemplateDemo(& tmpl, data);
-    //result = pushMessageToSingle(appKey, &singleMsg, &tmpl, Notification, &target);
+   printResult(result);
+
+}
+
+void tosingle_notifi(char *token, char *title, char *content) {
+
+    Message msg = {0};
+    msg.isOffline = true;
+    msg.offlineExpireTime = 1000*3600*2;
+    msg.pushNetWorkType = 0;
+    SingleMessage singleMsg = {0};
+    singleMsg.msg = msg;
+
+
+    Target target = {0};
+    //target.clientId = token;
+    target.appId = appId;
+
+    target.clientId = token;
+    IPushResult result = {0};
+
+	 NotificationTemplate tmpl = {0};
+	 NotificationTemplateDemo(& tmpl, title, content);
+	 result = pushMessageToSingle(appKey, &singleMsg, &tmpl, Notification, &target);
 
     printResult(result);
 
@@ -395,15 +391,12 @@ static ERL_NIF_TERM start_getui(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
       return enif_make_badarg(env);
 
     char host_char[1024] = {0};
-    char appId_char[1024] = {0};
     char appKey_char[1024] = {0};
     char masterSecret_char[1024] = {0};
     memcpy(host_char, (char *)host_bin.data, host_bin.size);
-    memcpy(appId_char, (char *)appId_bin.data, appId_bin.size);
     memcpy(appId, (char *)appId_bin.data, appId_bin.size);
     memcpy(appKey_char, (char *)appKey_bin.data, appKey_bin.size);
     memcpy(appKey, (char *)appKey_bin.data, appKey_bin.size);
-
     memcpy(masterSecret_char, (char *)masterSecret_bin.data, masterSecret_bin.size);
 
 
@@ -412,9 +405,10 @@ static ERL_NIF_TERM start_getui(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
          workers = 8;
     }
 
+    printf("getui init:%s  %s  %s  %s %d  \n", host_char, appId, appKey_char, masterSecret_char, workers);
     Result r = pushInit(host_char, appKey_char, masterSecret_char, "编码");//"编码"两个字为固定写法，不需要做转换
     if(r!=SUCCESS){
-	//printf("pushInit for app failed: ret=%d\n", r);
+    		printf("pushInit for app failed: ret=%d\n", r);
     }
 
     if(tracker_init(tracker) < 0 ) {
@@ -462,7 +456,7 @@ static ERL_NIF_TERM test(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 
 static ERL_NIF_TERM
-push_message(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+push_trans(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     msg_t *msg;
 
@@ -470,16 +464,43 @@ push_message(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    if(!enif_is_list(env, argv[0])) {
+    if(!enif_is_list(env, argv[0]) || !enif_is_list(env, argv[1])) {
         return enif_make_badarg(env);
     }
 
-    // fourth arg: list of input args
-    if(!enif_is_list(env, argv[1])) {
+    msg = msg_create(1);
+    if(!msg) {
+        return make_error_tuple(env, "command_create_failed");
+    }
+
+
+    if(enif_get_string(env, argv[0], msg->arg_c1, STACK_STRING_BUFF, ERL_NIF_LATIN1)<=0){
+    	return enif_make_int(env, 0);
+    }
+    if(enif_get_string(env, argv[1], msg->arg_c2, STACK_STRING_BUFF, ERL_NIF_LATIN1)<=0){
+    	return enif_make_int(env, 0);
+    }
+
+    msg->type = msg_gencall;
+
+    return push_command(env, msg);
+}
+
+
+static ERL_NIF_TERM
+push_notifi(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    msg_t *msg;
+
+    if(argc != 3) {
         return enif_make_badarg(env);
     }
 
-    msg = msg_create();
+    if(!enif_is_list(env, argv[0]) || !enif_is_list(env, argv[1]) || !enif_is_list(env, argv[2])) {
+        return enif_make_badarg(env);
+    }
+
+    msg = msg_create(0);
     if(!msg) {
         return make_error_tuple(env, "command_create_failed");
     }
@@ -488,6 +509,9 @@ push_message(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     	return enif_make_int(env, 0);
     }
     if(enif_get_string(env, argv[1], msg->arg_c2, STACK_STRING_BUFF, ERL_NIF_LATIN1)<=0){
+    	return enif_make_int(env, 0);
+    }
+    if(enif_get_string(env, argv[2], msg->arg_c3, STACK_STRING_BUFF, ERL_NIF_LATIN1)<=0){
     	return enif_make_int(env, 0);
     }
 
@@ -514,7 +538,8 @@ gen_bkdr_hash(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 static ErlNifFunc nif_funcs[] = {
     {"start_getui", 5, start_getui}, 
-    {"push", 2, push_message}
+    {"push_trans", 2, push_trans},
+	{"push_notifi", 3, push_notifi}
 };
 
 static int reload(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
